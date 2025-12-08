@@ -1,67 +1,87 @@
-﻿using Markers;
+﻿using Enemies;
+using Markers;
 using UnityEngine;
 
-namespace Enemies
+public class CucumberEnemy : MonoBehaviour
 {
-    public class CucumberEnemy : MonoBehaviour
+    [Header("Movement")]
+    [SerializeField] float baseSpeed = 2f;
+
+    ClinicTarget clinic;
+    EnemyHealth health;
+    Waves waves;
+
+    Vector2 targetPoint;
+    float speed;
+
+    void Awake()
     {
-        [SerializeField] float speed = 2f;
-        [SerializeField] float damage = 10f;
-        [SerializeField] float reachDistance = 0.35f; // расстояние, при котором считаем "достигли"
-        [SerializeField] AudioClip hitSfx; // опционально
+        TryGetComponent(out health);
+    }
 
-        ClinicTarget clinic;
-        bool isMoving;
+    public void Setup(ClinicTarget clinic, Waves waves)
+    {
+        this.clinic = clinic;
+        this.waves = waves;
 
-        void Start()
+        if (health != null && waves != null)
+            health.ApplyDifficulty(waves.Difficulty);
+
+        speed = baseSpeed * GetSpeedMultiplier();
+
+        PickRandomPoint();
+    }
+
+    void Update()
+    {
+        if (clinic == null)
         {
-            // попробуем получить явную ссылку заранее (если спавнер передал, то поле clinic уже установлен)
-            if (clinic == null)
-                clinic = FindAnyObjectByType<ClinicTarget>();
-
-            isMoving = clinic != null;
-        }
-
-        void Update()
-        {
-            if (!isMoving || clinic == null) return;
-
-            Vector3 dir = (clinic.transform.position - transform.position);
-            float dist = dir.magnitude;
-
-            if (dist <= reachDistance)
-            {
-                ReachClinic();
-                return;
-            }
-
-            transform.position += dir.normalized * speed * Time.deltaTime;
-            // можно добавить простую поворотную анимацию здесь
-        }
-
-        void ReachClinic()
-        {
-            if (clinic != null && clinic.IsAlive)
-            {
-                clinic.TakeDamage(damage);
-                if (hitSfx) AudioSource.PlayClipAtPoint(hitSfx, transform.position);
-            }
-
-            Die();
-            Debug.Log("Enemy reached clinic!");
-        }
-
-        void Die()
-        {
-            // TODO: заменить на пулл-реализацию при необходимости
             Destroy(gameObject);
+            return;
         }
 
-        // публичный метод для спавнера, чтобы передать цель (рекомендуется вместо FindAnyObject...)
-        public void Setup(ClinicTarget target)
+        MoveTowardsTarget();
+    }
+
+    void MoveTowardsTarget()
+    {
+        Vector2 pos = transform.position;
+        Vector2 dir = (targetPoint - pos);
+
+        if (dir.sqrMagnitude < 0.01f)
         {
-            clinic = target;
-            isMoving = clinic != null;
+            clinic.TakeDamage(Time.deltaTime * 4f);
+            return;
         }
+
+        dir.Normalize();
+        pos += dir * (speed * Time.deltaTime);
+
+        transform.position = pos;
+    }
+
+    void PickRandomPoint()
+    {
+        var col = clinic.GetComponent<BoxCollider2D>();
+
+        if (col == null)
+        {
+            targetPoint = clinic.transform.position;
+            return;
+        }
+
+        Bounds b = col.bounds;
+
+        float x = Random.Range(b.min.x, b.max.x);
+        float y = Random.Range(b.min.y, b.max.y);
+
+        targetPoint = new Vector2(x, y);
+    }
+
+    float GetSpeedMultiplier()
+    {
+        if (waves == null) return 1f;
+
+        return Mathf.Lerp(1f, 1.8f, waves.Difficulty);
     }
 }

@@ -13,6 +13,7 @@ public class Generator : MonoBehaviour
 
 
     Projector projector;
+    bool focusLocked;
 
     void Awake()
     {
@@ -23,10 +24,24 @@ public class Generator : MonoBehaviour
 
     void Update()
     {
-        if (projector.IsFocusActive && HasEnergy)
-            DrainEnergy();
+        if (projector == null) return;
+
+        if (!focusLocked)
+        {
+            if (projector.IsFocusActive && currentEnergy > 0f)
+                DrainEnergy();
+            else
+                Recharge();
+        }
         else
+        {
             Recharge();
+            if (currentEnergy >= maxEnergy)
+                focusLocked = false;
+        }
+
+        if (currentEnergy <= 0f)
+            focusLocked = true;
     }
 
     void DrainEnergy()

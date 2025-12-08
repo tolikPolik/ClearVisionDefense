@@ -23,12 +23,14 @@ namespace Markers
             if (!IsAlive) return;
 
             currentHealth -= amount;
+
             if (currentHealth <= 0f)
             {
                 currentHealth = 0f;
-                OnDestroyed?.Invoke();
-                // место для fx/логики завершения
-                Debug.Log("Clinic destroyed");
+
+                var go = FindAnyObjectByType<GameOver>();
+                if (go != null)
+                    go.TriggerGameOver();
             }
         }
     }

@@ -24,6 +24,11 @@ namespace Enemies
                 Die();
         }
 
+        public void ApplyDifficulty(float difficulty)
+        {
+            currentHealth = maxHealth * difficulty;
+        }
+
         void Die()
         {
             OnDied?.Invoke();

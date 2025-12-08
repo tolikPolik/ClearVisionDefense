@@ -7,23 +7,30 @@ namespace Spawners
 {
     public class EnemySpawner : MonoBehaviour
     {
+        [Header("References")]
         [SerializeField] GameObject enemyPrefab;
+        [SerializeField] Generator generator;
+
+        [Header("Spawn Settings")]
         [SerializeField] float baseSpawnInterval = 2f;
         [SerializeField] float spawnIntervalMin = 0.3f;
         [SerializeField] float spawnRadius = 8f;
-        [SerializeField] int maxEnemies = 50;
         [SerializeField] Transform[] spawnPoints;
 
-        [Header("Optional: dynamic difficulty")]
-        [SerializeField] Generator generator;
+        [Header("Limits")]
+        [SerializeField] int maxEnemies = 50;
 
         ClinicTarget clinic;
+        Waves waves;
+
         int currentCount;
         bool spawning;
 
         void Awake()
         {
             clinic = FindAnyObjectByType<ClinicTarget>();
+            waves = FindAnyObjectByType<Waves>();
+
             if (generator == null)
                 generator = FindAnyObjectByType<Generator>();
         }
@@ -44,9 +51,7 @@ namespace Spawners
             while (spawning)
             {
                 if (currentCount < maxEnemies)
-                {
                     SpawnOne();
-                }
 
                 float interval = ComputeInterval();
                 yield return new WaitForSeconds(interval);
@@ -56,24 +61,24 @@ namespace Spawners
         void SpawnOne()
         {
             Vector2 pos;
+
             if (spawnPoints != null && spawnPoints.Length > 0)
             {
-                var sp = spawnPoints[Random.Range(0, spawnPoints.Length)];
+                Transform sp = spawnPoints[Random.Range(0, spawnPoints.Length)];
                 pos = sp.position;
             }
             else
             {
-                pos = (Vector2)transform.position + Random.insideUnitCircle.normalized * spawnRadius;
+                pos = (Vector2)transform.position +
+                      Random.insideUnitCircle.normalized * spawnRadius;
             }
 
-            var go = Instantiate(enemyPrefab, pos, Quaternion.identity, transform);
-            var enemy = go.GetComponent<CucumberEnemy>();
-            if (enemy != null)
-            {
-                enemy.Setup(clinic);
-            }
-
+            GameObject go = Instantiate(enemyPrefab, pos, Quaternion.identity, transform);
             currentCount++;
+
+            if (go.TryGetComponent(out CucumberEnemy enemy))
+                enemy.Setup(clinic, waves);
+
             StartCoroutine(WatchEnemyDestroyed(go));
         }
 
@@ -87,15 +92,14 @@ namespace Spawners
 
         float ComputeInterval()
         {
-            if (generator != null)
-            {
-                float energyFactor = Mathf.Clamp01(generator.Energy01);
-                float multiplier = 1f - energyFactor * 0.7f;
-                float result = baseSpawnInterval * multiplier;
-                return Mathf.Clamp(result, spawnIntervalMin, baseSpawnInterval);
-            }
+            float diffFactor = waves ? Mathf.Lerp(1f, 0.3f, waves.Difficulty) : 1f;
 
-            return baseSpawnInterval;
+            float energyFactor = generator ? Mathf.Clamp01(generator.Energy01) : 1f;
+            float energyMult = 1f - energyFactor * 0.7f;
+
+            float interval = baseSpawnInterval * diffFactor * energyMult;
+
+            return Mathf.Clamp(interval, spawnIntervalMin, baseSpawnInterval);
         }
     }
 }
